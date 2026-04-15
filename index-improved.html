@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>RurouniYu Hub</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600;700;800&family=Syne:wght@400;500;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.1/ethers.umd.min.js"></script>
+<style>
+:root {
+  --bg:#0a0a0f;--surface:#111118;--surface2:#18181f;--surface3:#202029;
+  --border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.13);
+  --accent:#7c6fff;--accent2:#4fffb0;--accent3:#ff6b6b;
+  --text:#f0eeff;--muted:#888899;--muted2:#666677;
+  --mono:'Space Mono',monospace;--display:'Syne',sans-serif;--body:'Inter',sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:var(--body);min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(124,111,255,0.02) 1px,transparent 1px),linear-gradient(90deg,rgba(124,111,255,0.02) 1px,transparent 1px);background-size:60px 60px;pointer-events:none;z-index:0;}
+header{position:fixed;top:0;left:0;right:0;z-index:100;background:rgba(10,10,15,0.92);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:64px;}
+.logo{font-weight:800;font-size:18px;letter-spacing:-0.8px;display:flex;align-items:center;gap:10px;font-family:var(--display);}
+.logo-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);animation:pulse 2.5s ease-in-out infinite;}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.6;transform:scale(1.4)}}
+.header-right{display:flex;align-items:center;gap:12px;}
+.chain-selector{display:flex;gap:5px;background:var(--surface2);border:1px solid var(--border2);border-radius:12px;padding:5px;}
+.chain-btn{padding:6px 12px;border-radius:8px;border:none;font-family:var(--body);font-size:12px;font-weight:600;color:var(--muted2);background:transparent;cursor:pointer;transition:all 0.25s;text-transform:uppercase;letter-spacing:0.5px;}
+.chain-btn.active{background:var(--accent);color:#000;font-weight:700;}
+.wallet-btn{display:flex;align-items:center;gap:8px;padding:8px 16px;border-radius:10px;border:1px solid var(--border2);background:var(--surface);cursor:pointer;font-family:var(--mono);font-size:12px;color:var(--text);transition:all 0.25s;}
+.wallet-btn:hover{border-color:var(--accent);box-shadow:0 0 12px rgba(124,111,255,0.2);}
+.wallet-btn.connected{border-color:var(--accent2);box-shadow:0 0 12px rgba(79,255,176,0.15);}
+.wallet-indicator{width:7px;height:7px;border-radius:50%;background:var(--muted);}
+.wallet-indicator.on{background:var(--accent2);animation:pulse 2.5s ease-in-out infinite;}
+.nav-tabs{display:flex;gap:2px;padding:0 24px;background:var(--surface);border-bottom:1px solid var(--border);overflow-x:auto;}
+.nav-tab{padding:14px 18px;border:none;background:transparent;color:var(--muted);font-family:var(--body);font-size:13px;font-weight:600;cursor:pointer;border-bottom:3px solid transparent;transition:all 0.25s;margin-bottom:-1px;white-space:nowrap;}
+.nav-tab.active{color:var(--accent);border-bottom-color:var(--accent);}
+.nav-tab:hover{color:var(--text);}
+main{padding-top:128px;padding-bottom:60px;position:relative;z-index:1;}
+.page{display:none;padding:32px 24px;max-width:950px;margin:0 auto;}
+.page.active{display:block;animation:fadeIn 0.35s ease;}
+@keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.hero{text-align:center;padding:48px 24px 40px;}
+.hero-tag{display:inline-flex;align-items:center;gap:8px;background:rgba(124,111,255,0.12);border:1px solid rgba(124,111,255,0.3);border-radius:100px;padding:6px 16px;font-size:12px;color:var(--accent);letter-spacing:1px;text-transform:uppercase;margin-bottom:20px;font-weight:600;}
+.hero h1{font-size:clamp(40px,6vw,64px);font-weight:800;line-height:1.1;letter-spacing:-1.5px;margin-bottom:16px;font-family:var(--display);}
+.hero h1 span{background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.hero p{font-size:15px;color:var(--muted);max-width:500px;margin:0 auto;line-height:1.8;font-weight:500;}
+.chain-info-bar{display:flex;align-items:center;justify-content:center;gap:32px;flex-wrap:wrap;padding:16px 24px;background:var(--surface2);border-top:1px solid var(--border);border-bottom:1px solid var(--border);margin-bottom:40px;border-radius:14px;margin-left:24px;margin-right:24px;}
+.chain-info-item{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;}
+.chain-info-item span:first-child{color:var(--muted2);text-transform:uppercase;letter-spacing:0.5px;}
+.chain-info-item span:last-child{font-family:var(--mono);color:var(--accent);font-size:13px;}
+.modules-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:18px;}
+.module-card{background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:28px;cursor:pointer;transition:all 0.3s cubic-bezier(0.34,1.56,0.64,1);position:relative;overflow:hidden;group:hover;}
+.module-card::before{content:'';position:absolute;inset:0;opacity:0;transition:opacity 0.3s;}
+.module-card[data-mod="mines"]::before{background:radial-gradient(ellipse at top left,rgba(255,107,107,0.1) 0%,transparent 70%);}
+.module-card[data-mod="gm"]::before{background:radial-gradient(ellipse at top left,rgba(79,255,176,0.1) 0%,transparent 70%);}
+.module-card[data-mod="nft"]::before{background:radial-gradient(ellipse at top left,rgba(124,111,255,0.12) 0%,transparent 70%);}
+.module-card[data-mod="deploy"]::before{background:radial-gradient(ellipse at top left,rgba(255,200,79,0.1) 0%,transparent 70%);}
+.module-card:hover{border-color:var(--border2);transform:translateY(-6px);box-shadow:0 16px 40px rgba(124,111,255,0.15);}
+.module-card:hover::before{opacity:1;}
+.mod-icon{font-size:32px;margin-bottom:14px;display:inline-block;}
+.mod-title{font-size:18px;font-weight:700;margin-bottom:8px;font-family:var(--display);}
+.mod-desc{font-size:13px;color:var(--muted);line-height:1.7;margin-bottom:16px;}
+.mod-badge{display:inline-block;font-size:11px;letter-spacing:0.8px;text-transform:uppercase;padding:5px 12px;border-radius:8px;font-family:var(--mono);border:1px solid;font-weight:600;}
+.mod-badge.red{color:var(--accent3);border-color:rgba(255,107,107,0.4);background:rgba(255,107,107,0.1);}
+.mod-badge.green{color:var(--accent2);border-color:rgba(79,255,176,0.4);background:rgba(79,255,176,0.1);}
+.mod-badge.purple{color:var(--accent);border-color:rgba(124,111,255,0.4);background:rgba(124,111,255,0.12);}
+.mod-badge.yellow{color:#ffc84f;border-color:rgba(255,200,79,0.4);background:rgba(255,200,79,0.1);}
+.panel-overlay{display:none;position:fixed;inset:0;z-index:200;background:rgba(0,0,0,0.8);backdrop-filter:blur(12px);align-items:center;justify-content:center;padding:20px;}
+.panel-overlay.open{display:flex;animation:fadeInBg 0.3s ease;}
+@keyframes fadeInBg{from{opacity:0}to{opacity:1}}
+.panel{background:var(--surface);border:1px solid var(--border2);border-radius:22px;width:100%;max-width:540px;max-height:85vh;overflow-y:auto;animation:slideUp 0.35s cubic-bezier(0.34,1.56,0.64,1);}
+@keyframes slideUp{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}
+.panel-head{display:flex;align-items:center;justify-content:space-between;padding:24px 28px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface);z-index:1;}
+.panel-head h2{font-size:18px;font-weight:700;font-family:var(--display);}
+.close-btn{width:36px;height:36px;border-radius:10px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:all 0.2s;}
+.close-btn:hover{border-color:var(--accent);color:var(--text);}
+.panel-body{padding:28px;}
+.stats-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px;}
+.stat-box{background:var(--surface2);border:1px solid var(--border);border-radius:14px;padding:16px;transition:all 0.25s;}
+.stat-box:hover{border-color:var(--accent);}
+.stat-label{font-size:11px;color:var(--muted2);margin-bottom:8px;letter-spacing:1px;text-transform:uppercase;font-weight:600;}
+.stat-value{font-size:28px;font-weight:800;font-family:var(--display);}
+.stat-value.sm{font-size:13px;font-family:var(--mono);color:var(--accent);word-break:break-all;}
+.alert{padding:14px 16px;border-radius:12px;font-size:13px;margin-bottom:16px;font-family:var(--mono);line-height:1.6;border-left:4px solid;}
+.alert.warn{background:rgba(255,200,79,0.1);border-left-color:#ffc84f;color:#ffc84f;}
+.alert.success{background:rgba(79,255,176,0.1);border-left-color:var(--accent2);color:var(--accent2);}
+.alert.info{background:rgba(124,111,255,0.12);border-left-color:var(--accent);color:var(--accent);}
+.alert.err{background:rgba(255,107,107,0.1);border-left-color:var(--accent3);color:var(--accent3);}
+.form-group{margin-bottom:16px;}
+.form-label{font-size:12px;color:var(--muted2);margin-bottom:8px;display:block;letter-spacing:0.8px;text-transform:uppercase;font-weight:600;}
+.form-input,.form-select{width:100%;padding:12px 14px;border-radius:12px;background:var(--surface2);border:1px solid var(--border2);color:var(--text);font-family:var(--body);font-size:13px;outline:none;transition:all 0.25s;}
+.form-input:focus,.form-select:focus{border-color:var(--accent);box-shadow:0 0 12px rgba(124,111,255,0.2);}
+.form-select option{background:var(--surface2);}
+textarea.form-input{resize:vertical;min-height:90px;}
+.btn-primary{width:100%;padding:13px;border-radius:12px;border:none;background:linear-gradient(135deg,var(--accent),#6a5ff0);color:#fff;font-family:var(--body);font-size:14px;font-weight:700;cursor:pointer;transition:all 0.3s;margin-top:16px;box-shadow:0 8px 24px rgba(124,111,255,0.25);}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 12px 32px rgba(124,111,255,0.35);}
+.btn-primary:disabled{opacity:0.5;cursor:not-allowed;transform:none;}
+.btn-secondary{width:100%;padding:11px;border-radius:12px;border:1px solid var(--border2);background:transparent;color:var(--muted);font-family:var(--body);font-size:13px;cursor:pointer;transition:all 0.25s;margin-top:8px;font-weight:600;}
+.btn-secondary:hover{color:var(--text);border-color:var(--accent);}
+.owner-badge{display:inline-flex;align-items:center;gap:8px;background:rgba(79,255,176,0.12);border:1px solid rgba(79,255,176,0.3);border-radius:10px;padding:8px 14px;font-family:var(--mono);font-size:11px;color:var(--accent2);margin-bottom:16px;width:100%;justify-content:center;font-weight:600;}
+.mines-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:7px;margin-bottom:16px;}
+.mine-cell{aspect-ratio:1;border-radius:10px;background:var(--surface2);border:1px solid var(--border);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:18px;transition:all 0.2s;font-weight:700;}
+.mine-cell:hover:not(.revealed){border-color:var(--accent);background:rgba(124,111,255,0.15);transform:scale(1.05);}
+.mine-cell.safe{background:rgba(79,255,176,0.12);border-color:rgba(79,255,176,0.4);}
+.mine-cell.boom{background:rgba(255,107,107,0.12);border-color:rgba(255,107,107,0.4);}
+.mine-cell.loading{opacity:0.6;cursor:not-allowed;}
+.streak-display{text-align:center;padding:32px 0 24px;}
+.streak-number{font-size:80px;font-weight:800;color:var(--accent2);line-height:1;font-family:var(--display);text-shadow:0 4px 16px rgba(79,255,176,0.2);}
+.streak-label{font-size:13px;color:var(--muted);margin-top:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;}
+.nft-img{width:100%;max-width:260px;border-radius:18px;border:2px solid var(--border2);display:block;margin:0 auto 18px;}
+.nft-supply-bar{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:13px 16px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;font-size:13px;font-weight:600;}
+.tx-log{margin-top:20px;}
+.tx-log-title{font-size:11px;color:var(--muted2);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;font-weight:700;}
+.tx-item{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);font-size:12px;}
+.tx-item:last-child{border-bottom:none;}
+.tx-name{color:var(--muted);font-weight:500;}
+.tx-hash-link{font-family:var(--mono);color:var(--accent);font-size:11px;cursor:pointer;transition:all 0.2s;}
+.tx-hash-link:hover{color:#9c8fff;text-decoration:underline;}
+.tx-ok{color:var(--accent2);font-size:11px;font-weight:700;}
+.profile-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:28px;}
+.profile-stat{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:18px;transition:all 0.25s;}
+.profile-stat:hover{border-color:var(--accent);transform:translateY(-2px);}
+.profile-stat-label{font-size:11px;color:var(--muted2);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.8px;font-weight:600;}
+.profile-stat-value{font-size:28px;font-weight:800;font-family:var(--display);}
+.profile-stat-value.mono{font-size:12px;font-family:var(--mono);color:var(--accent);word-break:break-all;}
+.recent-tx{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:20px;}
+.recent-tx h3{font-size:15px;font-weight:700;margin-bottom:16px;font-family:var(--display);}
+.recent-tx-item{display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--border);font-size:12px;}
+.recent-tx-item:last-child{border-bottom:none;}
+.view-btn{font-size:11px;padding:5px 12px;border-radius:8px;border:1px solid var(--border2);background:transparent;color:var(--accent);cursor:pointer;font-family:var(--mono);transition:all 0.2s;font-weight:600;}
+.view-btn:hover{background:rgba(124,111,255,0.15);border-color:var(--accent);}
+.wallet-modal{display:none;position:fixed;inset:0;z-index:300;background:rgba(0,0,0,0.85);backdrop-filter:blur(12px);align-items:center;justify-content:center;padding:20px;}
+.wallet-modal.open{display:flex;}
+.wallet-modal-box{background:var(--surface);border:1px solid var(--border2);border-radius:22px;width:100%;max-width:380px;animation:slideUp 0.35s cubic-bezier(0.34,1.56,0.64,1);}
+.wallet-modal-head{padding:24px 28px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.wallet-modal-head h3{font-size:16px;font-weight:700;font-family:var(--display);}
+.wallet-modal-body{padding:16px;}
+.wallet-option{display:flex;align-items:center;gap:14px;padding:15px 16px;border-radius:13px;border:1px solid var(--border);cursor:pointer;background:transparent;width:100%;color:var(--text);font-family:var(--body);font-size:14px;font-weight:600;transition:all 0.25s;margin-bottom:10px;text-align:left;}
+.wallet-option:hover{border-color:var(--accent);background:rgba(124,111,255,0.1);}
+.wallet-icon{width:40px;height:40px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:20px;}
+.wallet-icon.mm{background:rgba(255,150,50,0.18);}
+.wallet-icon.rb{background:rgba(124,111,255,0.18);}
+.toast{position:fixed;bottom:24px;right:24px;z-index:999;background:var(--surface);border:1px solid var(--border2);border-radius:12px;padding:14px 18px;font-size:13px;max-width:320px;display:none;box-shadow:0 12px 32px rgba(0,0,0,0.4);}
+.toast.show{display:block;animation:slideIn 0.35s cubic-bezier(0.34,1.56,0.64,1);}
+@keyframes slideIn{from{opacity:0;transform:translateX(30px)}to{opacity:1;transform:translateX(0)}}
+.toast.ok{border-color:rgba(79,255,176,0.3);color:var(--accent2);background:rgba(79,255,176,0.08);}
+.toast.err{border-color:rgba(255,107,107,0.3);color:var(--accent3);background:rgba(255,107,107,0.08);}
+.spinner{display:inline-block;width:14px;height:14px;border:2.5px solid rgba(255,255,255,0.2);border-top-color:#fff;border-radius:50%;animation:spin 0.7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media(max-width:600px){.chain-selector{display:none;}.modules-grid{grid-template-columns:1fr;}.hero{padding:36px 20px 32px;}.chain-info-bar{margin-left:20px;margin-right:20px;}}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo"><div class="logo-dot"></div>RurouniYu Hub</div>
+  <div class="header-right">
+    <div class="chain-selector">
+      <button class="chain-btn active" data-chain="robinhood" onclick="switchChain('robinhood',this)">Robinhood</button>
+      <button class="chain-btn" data-chain="arc" onclick="switchChain('arc',this)">ARC</button>
+      <button class="chain-btn" data-chain="tempo" onclick="switchChain('tempo',this)">Tempo</button>
+    </div>
+    <button class="wallet-btn" id="walletBtn" onclick="openWalletModal()">
+      <span class="wallet-indicator" id="walletDot"></span>
+      <span id="walletLabel">Connect</span>
+    </button>
+  </div>
+</header>
+
+<div style="position:fixed;top:64px;left:0;right:0;z-index:99;background:var(--surface);border-bottom:1px solid var(--border);">
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="showPage('home',this)">Home</button>
+    <button class="nav-tab" onclick="showPage('mines',this)">Mines</button>
+    <button class="nav-tab" onclick="showPage('nft',this)">NFT Mint</button>
+    <button class="nav-tab" onclick="showPage('gm',this)">GM</button>
+    <button class="nav-tab" onclick="showPage('deploy',this)">Deploy</button>
+    <button class="nav-tab" onclick="showPage('profile',this)">Profile</button>
+  </div>
+</div>
+
+<main>
+<!-- HOME -->
+<div class="page active" id="page-home">
+  <div class="hero">
+    <div class="hero-tag">⬡ Onchain Interaction Studio</div>
+    <h1>RurouniYu <span>Hub</span></h1>
+    <p>Echte Transaktionen auf Robinhood, ARC und Tempo Testnet — jede Aktion zählt onchain.</p>
+  </div>
+  <div class="chain-info-bar">
+    <div class="chain-info-item"><span>Chain</span><span id="ci-name">Robinhood Testnet</span></div>
+    <div class="chain-info-item"><span>Chain ID</span><span id="ci-id">46630</span></div>
+    <div class="chain-info-item"><span>Currency</span><span id="ci-sym">ETH</span></div>
+  </div>
+  <div class="modules-grid" style="max-width:960px;margin:0 auto;">
+    <div class="module-card" data-mod="mines" onclick="showPage('mines',null)">
+      <div class="mod-icon">💣</div>
+      <div class="mod-title">Mines</div>
+      <div class="mod-desc">Felder aufdecken — jeder Klick sendet eine echte TX onchain.</div>
+      <span class="mod-badge red">TX per Click</span>
+    </div>
+    <div class="module-card" data-mod="gm" onclick="showPage('gm',null)">
+      <div class="mod-icon">☀️</div>
+      <div class="mod-title">Daily GM</div>
+      <div class="mod-desc">Täglich einchecken — Streak wird onchain gespeichert.</div>
+      <span class="mod-badge green">1 TX / Tag</span>
+    </div>
+    <div class="module-card" data-mod="nft" onclick="showPage('nft',null)">
+      <div class="mod-icon">🖼</div>
+      <div class="mod-title">NFT Mint</div>
+      <div class="mod-desc">RurouniYu Hub Collection minen — alle minen dasselbe NFT.</div>
+      <span class="mod-badge purple">Mint TX</span>
+    </div>
+    <div class="module-card" data-mod="deploy" onclick="showPage('deploy',null)">
+      <div class="mod-icon">🚀</div>
+      <div class="mod-title">Deploy</div>
+      <div class="mod-desc">MessageBoard oder Token Contract in einem Klick deployen.</div>
+      <span class="mod-badge yellow">Deploy TX</span>
+    </div>
+  </div>
+</div>
+
+<!-- MINES -->
+<div class="page" id="page-mines" style="max-width:540px;">
+  <div class="owner-badge">⬡ Alle TX zählen für dich</div>
+  <div class="stats-row">
+    <div class="stat-box"><div class="stat-label">Meine TX</div><div class="stat-value" id="mTx">0</div></div>
+    <div class="stat-box"><div class="stat-label">Aufgedeckt</div><div class="stat-value" id="mRev">0</div></div>
+  </div>
+  <div class="alert warn" id="minesChainAlert">Jeder Klick = 1 echte TX auf Robinhood Testnet</div>
+  <div class="mines-grid" id="mGrid"></div>
+  <button class="btn-secondary" onclick="resetMines()">↺ Neues Spiel</button>
+  <div class="tx-log"><div class="tx-log-title">TX Log</div><div id="mTxLog"></div></div>
+</div>
+
+<!-- GM -->
+<div class="page" id="page-gm" style="max-width:540px;">
+  <div class="owner-badge">⬡ Daily Streak Counter</div>
+  <div class="streak-display">
+    <div class="streak-number" id="sNum">0</div>
+    <div class="streak-label">Tage aktiv</div>
+  </div>
+  <div class="stats-row">
+    <div class="stat-box"><div class="stat-label">Heute</div><div class="stat-value" id="gmToday">—</div></div>
+    <div class="stat-box"><div class="stat-label">Gesamt TX</div><div class="stat-value" id="gmTotal">0</div></div>
+  </div>
+  <div class="alert info" id="gmAlert"></div>
+  <button class="btn-primary" id="gmBtn" onclick="sendGM()">GM senden ☀️</button>
+  <div class="tx-log"><div class="tx-log-title">TX Log</div><div id="gmTxLog"></div></div>
+</div>
+
+<!-- NFT -->
+<div class="page" id="page-nft" style="max-width:540px;">
+  <div class="owner-badge">⬡ RurouniYu Hub Collection</div>
+  <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256'%3E%3Crect fill='%237c6fff' width='256' height='256'/%3E%3Ctext x='128' y='128' font-size='24' font-weight='bold' text-anchor='middle' dominant-baseline='central' fill='white'%3ENFT%3C/text%3E%3C/svg%3E" class="nft-img" alt="NFT">
+  <div class="nft-supply-bar"><span>RurouniYu NFT</span><span id="nftCount">0 geminted</span></div>
+  <div class="alert info" id="nftAlert"></div>
+  <button class="btn-primary" id="nftBtn" onclick="mintNFT()">Mint NFT 🖼</button>
+  <div class="tx-log"><div class="tx-log-title">TX Log</div><div id="nftTxLog"></div></div>
+</div>
+
+<!-- DEPLOY -->
+<div class="page" id="page-deploy" style="max-width:540px;">
+  <div class="owner-badge">⬡ Smart Contract Deployer</div>
+  <div class="stats-row">
+    <div class="stat-box"><div class="stat-label">Deploys</div><div class="stat-value" id="depCount">0</div></div>
+    <div class="stat-box"><div class="stat-label">Chain</div><div class="stat-value sm" id="depChain">Robinhood</div></div>
+  </div>
+  <div class="form-group">
+    <label class="form-label">Contract Typ</label>
+    <select id="depType" class="form-select">
+      <option value="messageboard">MessageBoard</option>
+      <option value="token">Token</option>
+    </select>
+  </div>
+  <div class="form-group" id="depMsgGroup" style="display:none;">
+    <label class="form-label">Dein Name / Alias</label>
+    <input type="text" id="depName" class="form-input" placeholder="z.B. MyDapp">
+  </div>
+  <div class="alert info">Deployer spart Zeit und Gas bei Contract Erstellung.</div>
+  <button class="btn-primary" id="depBtn" onclick="deployContract()">Deploy 🚀</button>
+  <div class="tx-log"><div class="tx-log-title">TX Log</div><div id="depTxLog"></div></div>
+</div>
+
+<!-- PROFILE -->
+<div class="page" id="page-profile">
+  <div style="margin-bottom:28px;">
+    <h2 style="font-size:24px;font-weight:700;margin-bottom:6px;font-family:var(--display);">Profil</h2>
+    <p id="profileAddr" style="color:var(--muted);font-size:13px;">Wallet verbinden um Profil zu sehen</p>
+  </div>
+  <div class="profile-grid">
+    <div class="profile-stat">
+      <div class="profile-stat-label">Mines</div>
+      <div class="profile-stat-value" id="p-mines">0</div>
+    </div>
+    <div class="profile-stat">
+      <div class="profile-stat-label">GM Streak</div>
+      <div class="profile-stat-value" id="p-streak">0</div>
+    </div>
+    <div class="profile-stat">
+      <div class="profile-stat-label">NFTs</div>
+      <div class="profile-stat-value" id="p-nfts">0</div>
+    </div>
+    <div class="profile-stat">
+      <div class="profile-stat-label">Deploys</div>
+      <div class="profile-stat-value" id="p-deploys">0</div>
+    </div>
+    <div class="profile-stat">
+      <div class="profile-stat-label">GMs</div>
+      <div class="profile-stat-value" id="p-gms">0</div>
+    </div>
+    <div class="profile-stat">
+      <div class="profile-stat-label">Gesamt TX</div>
+      <div class="profile-stat-value" id="p-total">0</div>
+    </div>
+  </div>
+  <div class="recent-tx">
+    <h3>Letzte Transaktionen</h3>
+    <div id="recentTxList" style="font-size:13px;"></div>
+  </div>
+</div>
+</main>
+
+<div class="wallet-modal" id="walletModal" onclick="closeWalletModal(event)">
+  <div class="wallet-modal-box">
+    <div class="wallet-modal-head">
+      <h3>Wallet verbinden</h3>
+      <button class="close-btn" onclick="closeWalletModal()">✕</button>
+    </div>
+    <div class="wallet-modal-body">
+      <button class="wallet-option" onclick="connectWallet()">
+        <div class="wallet-icon mm">🦊</div>
+        <div><div style="font-size:13px;">MetaMask</div><div style="font-size:11px;color:var(--muted);margin-top:2px;">Browser Wallet</div></div>
+      </button>
+      <button class="wallet-option" onclick="connectWallet()">
+        <div class="wallet-icon rb">🐰</div>
+        <div><div style="font-size:13px;">Rabby</div><div style="font-size:11px;color:var(--muted);margin-top:2px;">Multi-chain Wallet</div></div>
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// DATENSTRUKTUREN & GLOBALE VARIABLEN
+const CHAINS={
+  robinhood:{name:'Robinhood Testnet',chainId:'0xb626',chainIdDec:46630,symbol:'ETH',rpc:'https://rpc.testnet.chain.robinhood.com',explorer:'https://blockscout.com/rootstock/testnet'},
+  arc:{name:'ARC Testnet',chainId:'0x4cef52',chainIdDec:5042002,symbol:'USDC',rpc:'wss://arc-testnet.drpc.org',explorer:'https://testnet.arcscan.io'},
+  tempo:{name:'Tempo Testnet',chainId:'0x5bf',chainIdDec:42431,symbol:'USD',rpc:'wss://rpc.moderato.tempo.xyz',explorer:'https://testnet.temposcan.io'}
+};
+const CONTRACT_ABI=[{"inputs":[{"internalType":"uint256","name":"index","type":"uint256"}],"name":"mine","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"gmCheckIn","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"string","name":"name","type":"string"}],"name":"mintNFT","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"string","name":"type","type":"string"},{"internalType":"string","name":"name","type":"string"}],"name":"logDeploy","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"user","type":"address"}],"name":"getUserStats","outputs":[{"internalType":"uint256","name":"","type":"uint256"},{"internalType":"uint256","name":"","type":"uint256"},{"internalType":"uint256","name":"","type":"uint256"},{"internalType":"uint256","name":"","type":"uint256"},{"internalType":"uint256","name":"","type":"uint256"},{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"}];
+const CONTRACT_ADDR={robinhood:'0x...',arc:'0x...',tempo:'0x...'};
+
+let currentChain='robinhood',walletAddress=null,signer=null,provider=null;
+let mineGrid=[],minesBusy=false,gmDoneToday=false,gmStreak=0;
+let txLog=[],txCounts={mines:0,gm:0,nft:0,deploy:0};
+
+// LOKALE SPEICHERUNG - PERSISTIERUNG
+function saveData(){
+  localStorage.setItem('rh_txLog',JSON.stringify(txLog));
+  localStorage.setItem('rh_txCounts',JSON.stringify(txCounts));
+  localStorage.setItem('rh_gmStreak',gmStreak.toString());
+  localStorage.setItem('rh_mineGrid',JSON.stringify(mineGrid));
+}
+function loadData(){
+  const log=localStorage.getItem('rh_txLog');
+  const counts=localStorage.getItem('rh_txCounts');
+  const streak=localStorage.getItem('rh_gmStreak');
+  const grid=localStorage.getItem('rh_mineGrid');
+  if(log) txLog=JSON.parse(log);
+  if(counts) txCounts=JSON.parse(counts);
+  if(streak) gmStreak=parseInt(streak);
+  if(grid) mineGrid=JSON.parse(grid);
+}
+
+// PAGE NAVIGATION
+function showPage(page,el){
+  if(el){
+    document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
+    el.classList.add('active');
+  }
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('page-'+page).classList.add('active');
+  if(page==='gm') initGM();
+  if(page==='mines') initMines();
+  if(page==='profile') loadProfile();
+}
+
+// CHAIN SWITCHING
+function switchChain(chain,el){
+  currentChain=chain;
+  document.querySelectorAll('.chain-btn').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+  const c=CHAINS[chain];
+  document.getElementById('ci-name').textContent=c.name;
+  document.getElementById('ci-id').textContent=c.chainIdDec;
+  document.getElementById('ci-sym').textContent=c.symbol;
+  document.getElementById('depChain').textContent=c.name;
+  const a=document.getElementById('minesChainAlert');
+  if(a) a.textContent='Jeder Klick = 1 echte TX auf '+c.name;
+  if(walletAddress) addChainToWallet(chain);
+}
+async function addChainToWallet(chain){
+  if(!window.ethereum) return;
+  const c=CHAINS[chain];
+  try{await window.ethereum.request({method:'wallet_addEthereumChain',params:[{chainId:c.chainId,chainName:c.name,rpcUrls:[c.rpc],nativeCurrency:{name:c.symbol,symbol:c.symbol,decimals:18}}]});}catch(e){}
+}
+
+// WALLET VERWALTUNG
+function openWalletModal(){
+  if(walletAddress){disconnectWallet();return;}
+  document.getElementById('walletModal').classList.add('open');
+}
+function closeWalletModal(e){
+  if(e&&e.target!==document.getElementById('walletModal')) return;
+  document.getElementById('walletModal').classList.remove('open');
+}
+async function connectWallet(){
+  document.getElementById('walletModal').classList.remove('open');
+  if(!window.ethereum){showToast('Bitte MetaMask oder Rabby installieren!','err');return;}
+  try{
+    provider=new ethers.BrowserProvider(window.ethereum);
+    // ENS deaktivieren
+    provider.getNetwork = async () => ({chainId: CHAINS[currentChain].chainIdDec, name: CHAINS[currentChain].name, ensAddress: null});
+    const accounts=await provider.send('eth_requestAccounts',[]);
+    signer=await provider.getSigner();
+    walletAddress=accounts[0];
+    document.getElementById('walletDot').classList.add('on');
+    document.getElementById('walletLabel').textContent=walletAddress.slice(0,6)+'...'+walletAddress.slice(-4);
+    document.querySelector('.wallet-btn').classList.add('connected');
+    await addChainToWallet(currentChain);
+    showToast('Wallet verbunden!','ok');
+    loadProfile();
+  }catch(e){showToast('Fehler: '+e.message,'err');}
+}
+function disconnectWallet(){
+  walletAddress=null;signer=null;provider=null;
+  document.getElementById('walletDot').classList.remove('on');
+  document.getElementById('walletLabel').textContent='Connect';
+  document.querySelector('.wallet-btn').classList.remove('connected');
+}
+
+// CONTRACT INTERAKTION
+function getContract(){
+  if(!signer) return null;
+  const addr=CONTRACT_ADDR[currentChain];
+  if(!addr||addr==='0x0000000000000000000000000000000000000000') return null;
+  return new ethers.Contract(addr,CONTRACT_ABI,signer);
+}
+function addTx(mod,label,hash){
+  txLog.unshift({hash,label,chain:currentChain,time:new Date().toLocaleTimeString('de-DE')});
+  txCounts[mod]++;
+  saveData();
+}
+function txHTML(ids,n=5){
+  return txLog.filter(t=>!ids||ids.includes(t.chain)).slice(0,n).map(t=>{
+    const ex=CHAINS[t.chain].explorer;
+    return '<div class="tx-item"><span class="tx-name">'+t.label+'</span><span class="tx-hash-link" onclick="window.open(\''+ex+'/tx/'+t.hash+'\',\'_blank\')">'+t.hash.slice(0,12)+'...</span><span class="tx-ok">✓</span></div>';
+  }).join('')||'<p style="color:var(--muted);font-size:12px;">Noch keine TX</p>';
+}
+
+// MINES SPIEL
+function initMines(){
+  if(mineGrid.length===0) resetMines();
+  buildMinesGrid();
+}
+function resetMines(){
+  mineGrid=Array.from({length:25},()=>({revealed:false,isMine:Math.random()<0.18}));
+  saveData();
+  buildMinesGrid();
+  const r=document.getElementById('mRev');if(r)r.textContent=0;
+}
+function buildMinesGrid(){
+  const g=document.getElementById('mGrid');if(!g)return;
+  g.innerHTML=mineGrid.map((c,i)=>{
+    let cls='mine-cell'+(c.revealed?(c.isMine?' boom':' safe'):'')+' revealed';
+    let ico=c.revealed?(c.isMine?'💣':'✓'):'';
+    return '<div class="'+cls+'" onclick="revealCell('+i+')">'+ico+'</div>';
+  }).join('');
+}
+async function revealCell(i){
+  if(!walletAddress){showToast('Wallet zuerst verbinden!','err');return;}
+  if(mineGrid[i].revealed||minesBusy)return;
+  const contract=getContract();
+  if(!contract){showToast('Contract nicht verfügbar!','err');return;}
+  minesBusy=true;
+  const cells=document.querySelectorAll('.mine-cell');
+  cells.forEach(c=>c.classList.add('loading'));
+  try{
+    showToast('Warte auf Rabby...','ok');
+    const tx=await contract.mine(i);
+    mineGrid[i].revealed=true;
+    saveData();
+    buildMinesGrid();
+    showToast('TX gesendet...','ok');
+    await tx.wait();
+    addTx('mines','Reveal #'+i,tx.hash);
+    const rev=mineGrid.filter(c=>c.revealed).length;
+    document.getElementById('mTx').textContent=txCounts.mines;
+    document.getElementById('mRev').textContent=rev;
+    document.getElementById('mTxLog').innerHTML=txHTML([currentChain]);
+    showToast('TX bestätigt! ✓','ok');
+    updateProfile();
+  }catch(e){
+    mineGrid[i].revealed=false;
+    saveData();
+    buildMinesGrid();
+    showToast('Fehler: '+(e.reason||e.message),'err');
+  }
+  minesBusy=false;
+}
+
+// GM CHECK-IN
+function initGM(){
+  const now=new Date();
+  const utcDay=now.toISOString().slice(0,10);
+  document.getElementById('gmDate').textContent=utcDay;
+  const lastGM=localStorage.getItem('lastGMDay_'+currentChain);
+  gmDoneToday=(lastGM===utcDay);
+  const btn=document.getElementById('gmBtn');
+  if(btn){
+    btn.disabled=gmDoneToday;
+    btn.textContent=gmDoneToday?'GM heute gesendet ✓':'GM senden ☀️';
+  }
+  const al=document.getElementById('gmAlert');
+  if(al){
+    if(gmDoneToday) al.innerHTML='<div class="alert success">✓ GM heute bereits gesendet! Morgen wieder.</div>';
+    else al.innerHTML='<div class="alert info">Täglich einchecken und deine Streak aufbauen!</div>';
+  }
+  document.getElementById('gmToday').textContent=gmDoneToday?'✓':'—';
+}
+async function sendGM(){
+  if(!walletAddress){showToast('Wallet zuerst verbinden!','err');return;}
+  const contract=getContract();
+  if(!contract){showToast('Contract nicht verfügbar!','err');return;}
+  const btn=document.getElementById('gmBtn');
+  btn.disabled=true;btn.innerHTML='<span class="spinner"></span>';
+  try{
+    showToast('Warte auf Rabby...','ok');
+    const tx=await contract.gmCheckIn();
+    showToast('TX gesendet...','ok');
+    await tx.wait();
+    gmStreak++;gmDoneToday=true;
+    const utcDay=new Date().toISOString().slice(0,10);
+    localStorage.setItem('lastGMDay_'+currentChain,utcDay);
+    addTx('gm','Daily GM',tx.hash);
+    document.getElementById('sNum').textContent=gmStreak;
+    document.getElementById('gmTotal').textContent=txCounts.gm;
+    document.getElementById('gmToday').textContent='✓';
+    btn.textContent='GM heute gesendet ✓';
+    document.getElementById('gmAlert').innerHTML='<div class="alert success">✓ GM onchain! Streak: '+gmStreak+' Tage</div>';
+    document.getElementById('gmTxLog').innerHTML=txHTML([currentChain]);
+    showToast('GM bestätigt! Streak: '+gmStreak,'ok');
+    updateProfile();
+  }catch(e){
+    btn.disabled=false;btn.textContent='GM senden ☀️';
+    showToast('Fehler: '+(e.reason||e.message),'err');
+  }
+}
+
+// NFT MINTING
+async function mintNFT(){
+  if(!walletAddress){showToast('Wallet zuerst verbinden!','err');return;}
+  const contract=getContract();
+  if(!contract){showToast('Contract nicht verfügbar!','err');return;}
+  const btn=document.getElementById('nftBtn');
+  btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Minting...';
+  try{
+    const tx=await contract.mintNFT('RurouniYu Hub NFT');
+    showToast('TX gesendet...','ok');
+    await tx.wait();
+    addTx('nft','Mint: RurouniYu Hub NFT',tx.hash);
+    txCounts.nft++;
+    document.getElementById('nftCount').textContent=txCounts.nft+' geminted';
+    document.getElementById('nftAlert').innerHTML='<div class="alert success">✓ NFT geminted!</div>';
+    document.getElementById('nftTxLog').innerHTML=txHTML([currentChain]);
+    btn.disabled=false;btn.textContent='Mint NFT 🖼';
+    showToast('NFT geminted! ✓','ok');
+    updateProfile();
+  }catch(e){
+    btn.disabled=false;btn.textContent='Mint NFT 🖼';
+    showToast('Fehler: '+(e.reason||e.message),'err');
+  }
+}
+
+// DEPLOY
+document.addEventListener('DOMContentLoaded',function(){
+  const depType=document.getElementById('depType');
+  if(depType) depType.addEventListener('change',function(){
+    document.getElementById('depMsgGroup').style.display=this.value==='messageboard'?'block':'none';
+  });
+});
+async function deployContract(){
+  if(!walletAddress){showToast('Wallet zuerst verbinden!','err');return;}
+  const contract=getContract();
+  if(!contract){showToast('Contract nicht verfügbar!','err');return;}
+  const type=document.getElementById('depType').value;
+  const name=document.getElementById('depName').value.trim()||'MyContract';
+  const btn=document.getElementById('depBtn');
+  btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Deploying...';
+  try{
+    const tx=await contract.logDeploy(type,name);
+    showToast('TX gesendet...','ok');
+    await tx.wait();
+    addTx('deploy','Deploy '+type+': '+name,tx.hash);
+    txCounts.deploy++;
+    document.getElementById('depCount').textContent=txCounts.deploy;
+    document.getElementById('depAlert').innerHTML='<div class="alert success">✓ Deploy TX bestätigt!</div>';
+    document.getElementById('depTxLog').innerHTML=txHTML([currentChain]);
+    btn.disabled=false;btn.textContent='Deploy 🚀';
+    showToast(name+' deployed! ✓','ok');
+    updateProfile();
+  }catch(e){
+    btn.disabled=false;btn.textContent='Deploy 🚀';
+    showToast('Fehler: '+(e.reason||e.message),'err');
+  }
+}
+
+// PROFIL
+function updateProfile(){
+  document.getElementById('p-mines').textContent=txCounts.mines;
+  document.getElementById('p-streak').textContent=gmStreak;
+  document.getElementById('p-nfts').textContent=txCounts.nft;
+  document.getElementById('p-deploys').textContent=txCounts.deploy;
+  document.getElementById('p-total').textContent=txCounts.mines+txCounts.gm+txCounts.nft+txCounts.deploy;
+  document.getElementById('p-gms').textContent=txCounts.gm;
+  document.getElementById('recentTxList').innerHTML=txLog.slice(0,6).map(t=>{
+    const ex=CHAINS[t.chain].explorer;
+    return '<div class="recent-tx-item"><span>'+t.label+'</span><button class="view-btn" onclick="window.open(\''+ex+'/tx/'+t.hash+'\',\'_blank\')">Explorer ↗</button></div>';
+  }).join('')||'<p style="color:var(--muted);font-size:12px;">Noch keine TX</p>';
+}
+async function loadProfile(){
+  if(!walletAddress){document.getElementById('profileAddr').textContent='Wallet verbinden um Profil zu sehen';return;}
+  document.getElementById('profileAddr').textContent=walletAddress;
+  updateProfile();
+}
+
+// TOAST BENACHRICHTIGUNGEN
+function showToast(msg,type='ok'){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.className='toast show '+type;
+  clearTimeout(window._tt);
+  window._tt=setTimeout(()=>t.classList.remove('show'),3800);
+}
+
+// INIT
+loadData();
+updateProfile();
+</script>
+</body>
+</html>
